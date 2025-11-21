@@ -1,0 +1,28 @@
+{
+  "name": "skyflow-demo-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "seed-redis": "tsx src/scripts/seed-redis.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@xenova/transformers": "^2.17.2",
+    "dotenv": "^16.4.5",
+    "next": "^14.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "redis": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.7.2"
+  }
+}
