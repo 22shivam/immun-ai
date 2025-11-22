@@ -91,19 +91,50 @@ interface SearchResult {
   similarity: string;
 }
 
+interface AttackAttempt {
+  attackNumber: number;
+  source: string;
+  prompt: string;
+  unprotectedResult: {
+    response: string;
+    leaked: string[];
+    toolsUsed: string[];
+  };
+  protectedResult: {
+    response: string;
+    leaked: string[];
+    toolsUsed: string[];
+  };
+  success: boolean;
+  leakageScore: number;
+  reasoning: string;
+}
+
+interface AgentReport {
+  totalAttacks: number;
+  successfulAttacks: number;
+  failedAttacks: number;
+  summary: string;
+  vulnerabilities: string[];
+  recommendations: string[];
+  attackAttempts: AttackAttempt[];
+}
+
 export default function Home() {
   const [selectedAttack, setSelectedAttack] = useState(0);
   const [customPrompt, setCustomPrompt] = useState('');
-  const [useCustom, setUseCustom] = useState(false);
+  const [attackMode, setAttackMode] = useState<'preset' | 'custom' | 'agent'>('preset');
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [agentRunning, setAgentRunning] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [results, setResults] = useState<{
     unprotected: AttackResult;
     protected: AttackResult;
   } | null>(null);
+  const [agentReport, setAgentReport] = useState<AgentReport | null>(null);
   const [dataSources, setDataSources] = useState<DataSources | null>(null);
   const [error, setError] = useState('');
 
@@ -171,7 +202,7 @@ export default function Home() {
     setError('');
     setResults(null);
 
-    const prompt = useCustom ? customPrompt : attackScenarios[selectedAttack].prompt;
+    const prompt = attackMode === 'custom' ? customPrompt : attackScenarios[selectedAttack].prompt;
 
     try {
       const res = await fetch('/api/attack', {
@@ -194,7 +225,33 @@ export default function Home() {
     }
   };
 
-  const currentPrompt = useCustom ? customPrompt : attackScenarios[selectedAttack].prompt;
+  const runAgentAttack = async () => {
+    setAgentRunning(true);
+    setError('');
+    setAgentReport(null);
+    setResults(null);
+
+    try {
+      const res = await fetch('/api/agent-attack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to run agent attack');
+      }
+
+      const data = await res.json();
+      setAgentReport(data.report);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setAgentRunning(false);
+    }
+  };
+
+  const currentPrompt = attackMode === 'custom' ? customPrompt : attackScenarios[selectedAttack].prompt;
 
   return (
     <div className="container">
@@ -274,20 +331,27 @@ export default function Home() {
 
         <div className="tabs">
           <button
-            className={`tab ${!useCustom ? 'active' : ''}`}
-            onClick={() => setUseCustom(false)}
+            className={`tab ${attackMode === 'preset' ? 'active' : ''}`}
+            onClick={() => setAttackMode('preset')}
           >
             Preset Attacks
           </button>
           <button
-            className={`tab ${useCustom ? 'active' : ''}`}
-            onClick={() => setUseCustom(true)}
+            className={`tab ${attackMode === 'custom' ? 'active' : ''}`}
+            onClick={() => setAttackMode('custom')}
           >
             Custom Prompt
           </button>
+          <button
+            className={`tab ${attackMode === 'agent' ? 'active' : ''}`}
+            onClick={() => setAttackMode('agent')}
+            style={{ background: attackMode === 'agent' ? '#8b5cf6' : '' }}
+          >
+            🤖 Attack Agent
+          </button>
         </div>
 
-        {!useCustom ? (
+        {attackMode === 'preset' ? (
           <div className="attack-controls">
             <select
               className="attack-select"
@@ -304,7 +368,7 @@ export default function Home() {
               {loading ? 'Running...' : '🚀 Run Attack'}
             </button>
           </div>
-        ) : (
+        ) : attackMode === 'custom' ? (
           <div>
             <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem' }}>
               <button
@@ -331,13 +395,171 @@ export default function Home() {
               {loading ? 'Running...' : '🚀 Run Attack'}
             </button>
           </div>
+        ) : (
+          <div>
+            <p style={{ color: '#888', marginBottom: '1rem', fontSize: '0.95rem', lineHeight: '1.6' }}>
+              The autonomous Attack Agent uses AI to:
+            </p>
+            <ul style={{ color: '#888', marginBottom: '1.5rem', paddingLeft: '1.5rem', lineHeight: '1.8' }}>
+              <li>🔍 Search RedisVL for relevant attack vectors</li>
+              <li>🎯 Test attacks against both agents automatically</li>
+              <li>🧠 Learn from results and generate novel attacks</li>
+              <li>📊 Produce comprehensive security report</li>
+            </ul>
+            <button
+              className="attack-btn"
+              onClick={runAgentAttack}
+              disabled={agentRunning}
+              style={{ background: '#8b5cf6', width: '100%' }}
+            >
+              {agentRunning ? '🤖 Agent Running... (this may take 2-3 minutes)' : '🚀 Run Autonomous Attack Agent'}
+            </button>
+
+            {agentReport && (
+              <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#1a1a1a', borderRadius: '8px', border: '1px solid #8b5cf6' }}>
+                <h4 style={{ color: '#8b5cf6', marginBottom: '1rem' }}>📊 Agent Report</h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div style={{ padding: '1rem', background: '#222', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#888' }}>Total Attacks</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff' }}>{agentReport.totalAttacks}</div>
+                  </div>
+                  <div style={{ padding: '1rem', background: '#222', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#888' }}>Successful</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ef4444' }}>{agentReport.successfulAttacks}</div>
+                  </div>
+                  <div style={{ padding: '1rem', background: '#222', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#888' }}>Failed</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>{agentReport.failedAttacks}</div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h5 style={{ color: '#fff', marginBottom: '0.5rem' }}>Summary</h5>
+                  <p style={{ color: '#aaa', lineHeight: '1.6' }}>{agentReport.summary}</p>
+                </div>
+
+                {agentReport.vulnerabilities && agentReport.vulnerabilities.length > 0 && (
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <h5 style={{ color: '#fff', marginBottom: '0.5rem' }}>🔴 Vulnerabilities Discovered</h5>
+                    <ul style={{ color: '#aaa', paddingLeft: '1.5rem', lineHeight: '1.6' }}>
+                      {agentReport.vulnerabilities.map((vuln, i) => (
+                        <li key={i}>{vuln}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {agentReport.recommendations && agentReport.recommendations.length > 0 && (
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <h5 style={{ color: '#fff', marginBottom: '0.5rem' }}>💡 Recommendations</h5>
+                    <ul style={{ color: '#aaa', paddingLeft: '1.5rem', lineHeight: '1.6' }}>
+                      {agentReport.recommendations.map((rec, i) => (
+                        <li key={i}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Detailed Attack Attempts */}
+                {agentReport.attackAttempts && agentReport.attackAttempts.length > 0 && (
+                  <div style={{ marginTop: '2rem' }}>
+                    <h5 style={{ color: '#8b5cf6', marginBottom: '1rem' }}>🎯 Detailed Attack Attempts</h5>
+                    {agentReport.attackAttempts.map((attack, i) => (
+                      <div key={i} style={{ marginBottom: '2rem', padding: '1.5rem', background: '#0a0a0a', borderRadius: '8px', border: attack.success ? '1px solid #ef4444' : '1px solid #10b981' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                          <h6 style={{ color: '#fff', margin: 0 }}>Attack #{attack.attackNumber}</h6>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.5rem', background: '#222', borderRadius: '4px', color: '#888' }}>
+                              {attack.source}
+                            </span>
+                            <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.5rem', background: attack.success ? '#ef4444' : '#10b981', borderRadius: '4px', color: '#fff' }}>
+                              {attack.success ? 'VULNERABLE' : 'BLOCKED'}
+                            </span>
+                            <span style={{ fontSize: '0.85rem', padding: '0.25rem 0.5rem', background: '#8b5cf6', borderRadius: '4px', color: '#fff' }}>
+                              Score: {attack.leakageScore}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ marginBottom: '1rem', padding: '1rem', background: '#1a1a1a', borderRadius: '6px' }}>
+                          <div style={{ fontSize: '0.85rem', color: '#888', marginBottom: '0.5rem' }}>Attack Prompt:</div>
+                          <div style={{ color: '#fff', fontSize: '0.9rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{attack.prompt}</div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          {/* Unprotected Agent */}
+                          <div style={{ padding: '1rem', background: '#1a1a1a', borderRadius: '6px', border: '1px solid #ef4444' }}>
+                            <div style={{ fontSize: '0.85rem', color: '#ef4444', marginBottom: '0.5rem', fontWeight: 'bold' }}>🔓 Unprotected Agent</div>
+                            <div style={{ marginBottom: '0.75rem' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.25rem' }}>Response:</div>
+                              <div style={{ color: '#ccc', fontSize: '0.85rem', lineHeight: '1.4', maxHeight: '150px', overflow: 'auto' }}>
+                                {attack.unprotectedResult.response.substring(0, 300)}
+                                {attack.unprotectedResult.response.length > 300 && '...'}
+                              </div>
+                            </div>
+                            {attack.unprotectedResult.leaked.length > 0 && (
+                              <div>
+                                <div style={{ fontSize: '0.75rem', color: '#ef4444', marginBottom: '0.25rem' }}>⚠️ Leaked Data:</div>
+                                <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: '#ef4444' }}>
+                                  {attack.unprotectedResult.leaked.map((leak, j) => (
+                                    <li key={j}>{leak}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {attack.unprotectedResult.toolsUsed.length > 0 && (
+                              <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#666' }}>
+                                Tools: {attack.unprotectedResult.toolsUsed.join(', ')}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Protected Agent */}
+                          <div style={{ padding: '1rem', background: '#1a1a1a', borderRadius: '6px', border: '1px solid #10b981' }}>
+                            <div style={{ fontSize: '0.85rem', color: '#10b981', marginBottom: '0.5rem', fontWeight: 'bold' }}>🔐 Skyflow Protected Agent</div>
+                            <div style={{ marginBottom: '0.75rem' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.25rem' }}>Response:</div>
+                              <div style={{ color: '#ccc', fontSize: '0.85rem', lineHeight: '1.4', maxHeight: '150px', overflow: 'auto' }}>
+                                {attack.protectedResult.response.substring(0, 300)}
+                                {attack.protectedResult.response.length > 300 && '...'}
+                              </div>
+                            </div>
+                            {attack.protectedResult.leaked.length > 0 ? (
+                              <div>
+                                <div style={{ fontSize: '0.75rem', color: '#f59e0b', marginBottom: '0.25rem' }}>⚠️ Exposed (tokens only):</div>
+                                <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: '#f59e0b' }}>
+                                  {attack.protectedResult.leaked.map((leak, j) => (
+                                    <li key={j}>{leak}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: '0.85rem', color: '#10b981' }}>✅ No data leaked</div>
+                            )}
+                            {attack.protectedResult.toolsUsed.length > 0 && (
+                              <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#666' }}>
+                                Tools: {attack.protectedResult.toolsUsed.join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
-        <div className="prompt-preview">
-          <strong>Attack Prompt:</strong>
-          {'\n\n'}
-          {currentPrompt}
-        </div>
+        {attackMode !== 'agent' && (
+          <div className="prompt-preview">
+            <strong>Attack Prompt:</strong>
+            {'\n\n'}
+            {currentPrompt}
+          </div>
+        )}
       </section>
 
       {/* Semantic Attack Search (RedisVL) */}
