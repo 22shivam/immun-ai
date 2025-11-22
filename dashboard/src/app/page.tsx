@@ -112,8 +112,8 @@ interface AttackAttempt {
 
 interface AgentReport {
   totalAttacks: number;
-  successfulAttacks: number;
-  failedAttacks: number;
+  unprotectedVulnerabilities: number;
+  protectedVulnerabilities: number;
   summary: string;
   vulnerabilities: string[];
   recommendations: string[];
@@ -425,12 +425,12 @@ export default function Home() {
                     <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff' }}>{agentReport.totalAttacks}</div>
                   </div>
                   <div style={{ padding: '1rem', background: '#222', borderRadius: '6px' }}>
-                    <div style={{ fontSize: '0.85rem', color: '#888' }}>Successful</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ef4444' }}>{agentReport.successfulAttacks}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#888' }}>Unprotected Agent</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ef4444' }}>{agentReport.unprotectedVulnerabilities} vulnerabilities</div>
                   </div>
                   <div style={{ padding: '1rem', background: '#222', borderRadius: '6px' }}>
-                    <div style={{ fontSize: '0.85rem', color: '#888' }}>Failed</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>{agentReport.failedAttacks}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#888' }}>Protected Agent</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>{agentReport.protectedVulnerabilities} vulnerabilities</div>
                   </div>
                 </div>
 
@@ -486,6 +486,13 @@ export default function Home() {
                           <div style={{ fontSize: '0.85rem', color: '#888', marginBottom: '0.5rem' }}>Attack Prompt:</div>
                           <div style={{ color: '#fff', fontSize: '0.9rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{attack.prompt}</div>
                         </div>
+
+                        {attack.reasoning && (
+                          <div style={{ marginBottom: '1rem', padding: '1rem', background: '#1a1a1a', borderRadius: '6px', border: '1px solid #8b5cf6' }}>
+                            <div style={{ fontSize: '0.85rem', color: '#8b5cf6', marginBottom: '0.5rem' }}>🤖 Claude Analysis:</div>
+                            <div style={{ color: '#ccc', fontSize: '0.85rem', lineHeight: '1.6' }}>{attack.reasoning}</div>
+                          </div>
+                        )}
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                           {/* Unprotected Agent */}
